@@ -1,0 +1,130 @@
+#! /bin/python3
+'''
+10012023, Tues
+It took my whole day, which I could've used for studying so much.
+I started to work on it when my laptop used full 1.5GB of daily data allowence of Papa's airtel SIM
+Just because I wasn't present at the moment to stop it after it used 700MB, I was playing with Pako and Others.
+I know I can't rely on me being present in front of laptop anymore, so I designed this to automate turning off network connections when I reach the limit..
+
+Next to that, if I may want to append something to it later, I may add a feature for it to distinguish
+between net data usage and local data usage. I may add a help menu to it, which would print itself with --help argument.
+
+
+This application relies on ifconfig and nmcli for its working. As you may know, ifconfig gives info on how much data has been used
+by a NIC in its listing. It uses that to determine if I've crossed data limit or not.
+Doesn't that mean it won't work for USB thethering and also it can't be deployed on any linux machine. I may work on this later. Currently,
+I don't have much time and no need to monitor usb0 interface.
+'''
+
+import os
+import sys
+import time
+
+def DataUsage():
+	# Get data usage info from ifconfig in a file
+	cwd = '/tmp/custom_logs_by_me/'
+	os.system(f'ifconfig wlp2s0 > "{cwd}ifconfig_data"')
+
+	# Get data from the file 
+	wifi_data = '';
+	with open(f'{cwd}ifconfig_data') as f:
+		wifi_data_raw = f.read()
+	for i in wifi_data_raw.split('\n\n'):
+		if 'wlp2s0' in i:
+			wifi_data = i;
+		
+#	if not wifi_data:											I don't need it here, as it's being checked every time laetst data usaeg is calculated. I want this to be checked only one time when this program starts. I am copying it down to the place I need it. 
+#		#raise ValueError('wlp2s0 is not present in ifconfig listing as expected.')                  This directly exits the program which isn't what I wanted.
+#		print('\nWifi NIC has not been turned on yet.');
+#		sys.exit();
+
+	# Separate wifi down and wifi up data usage
+	wifi_data_down = str([i for i in wifi_data.split('\n') if 'RX packets' in i])[2:-2]
+	wifi_data_down = wifi_data_down[wifi_data_down.index('bytes')+6:].split()[0]
+	wifi_data_down = int(wifi_data_down) / (1024 * 1024)		# in MB
+	wifi_data_down = round(wifi_data_down, 2)			# final data downloaded
+
+	wifi_data_up = str([i for i in wifi_data.split('\n') if 'TX packets' in i])[2:-2]
+	wifi_data_up = wifi_data_up[wifi_data_up.index('bytes')+6:].split()[0]
+	wifi_data_up = round((int(wifi_data_up) / (1024 * 1024)), 2)	# final data uploaded
+	return wifi_data_up, wifi_data_down
+
+
+# Monitor data usage and alert if data limit is reached
+def DataUsageMonitor(limit):
+	data_used_start = sum(DataUsage());
+	print(f"\nData Usage Limit is {limit} MB\n");
+	i = 0;
+	while True:
+		i += 1;
+		try:
+			data_used_now = sum(DataUsage()) - data_used_start;
+			if data_used_now > limit:
+				break
+			if i % 10 == 0:
+				i = 0;		
+				NetworkCheck();
+			print(f'\rData used till now: {round(data_used_now, 2)}', end='');
+			time.sleep(10);
+		except KeyboardInterrupt:
+			print('\n\rExiting before achieving data limit...')
+			'''for i in range(3, 0, -1):
+				print(f'\rExiting in {i}', end='');
+				time.sleep(1);
+			print();'''                    # currently I like quick exits more than prev exit.
+			sys.exit();
+		except ValueError:
+			pass;
+			
+	LimitData();
+
+
+# Stop using data anymore, but how are you going to do that?
+def LimitData():
+	result = os.system('nmcli radio wifi off');	# use 'nmcli networking off' to turn whole networking. This turns off wifi, but won't disable usb thethering. I'm thinking about future too, to implement the feature to monitor usb thethering.
+	if result == 0:
+		os.system('notify-send "Data Usage" "Data Usage Limit reached, wifi has been disabled"')
+		print('\n\nData Usage Limit reached. Wifi has been turned off.')
+	else:
+		os.system(f'notify-send "Error - Data Usage" "Couldn\'t disable networking, nmcli didn\'t work for some reason. nmcli output is {result}"')
+	print('=================================================================');
+	sys.exit()
+	
+	
+def PrintDataUsage():
+	try:
+		data_up, data_down = DataUsage()
+		print(f'Total data used till now: {data_up} MB uploaded, {data_down} MB downloaded')
+	except ValueError:
+		print("Turn on wifi at first.");
+		sys.exit()
+		
+
+def NetworkCheck():
+	os.system('nmcli networking connectivity check > /tmp/custom_logs_by_me/nmcli_network_check')
+	with open('/tmp/custom_logs_by_me/nmcli_network_check') as f:
+		network_check = f.read();
+	if 'full' not in network_check:
+		print('There is no wifi connection.')
+		os.system('notify-send "Data Usage" "We\'ve lost wifi connection"')
+
+if __name__ == '__main__':
+	'''To give it nic selection functionality by user input, define a var 'nic', give it user inputted nic, edit the
+	functions to use var nic instead of wlp2s0, make wlp2s0 default nic in case of no user input. You may also add a help
+	feature then to make you recall the syntax of the program.'''
+	print('=================================================================');
+	
+	if len(sys.argv) == 1:
+		PrintDataUsage();
+	else:
+		if sys.argv[1] == 'l' or ('lim' in sys.argv[1]):
+			try:
+				limit = int(sys.argv[2]);
+			except ValueError:
+				print("Give integer input.");
+				sys.exit();
+			except IndexError:
+				limit = 50;
+				print('Taking default limit of 50 MB')
+			PrintDataUsage();
+			DataUsageMonitor(limit);
