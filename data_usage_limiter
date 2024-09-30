@@ -1,15 +1,6 @@
 #! /bin/python3
 '''
 10012023, Tues
-It took my whole day, which I could've used for studying so much.
-I started to work on it when my laptop used full 1.5GB of daily data allowence of Papa's airtel SIM
-Just because I wasn't present at the moment to stop it after it used 700MB, I was playing with Pako and Others.
-I know I can't rely on me being present in front of laptop anymore, so I designed this to automate turning off network connections when I reach the limit..
-
-Next to that, if I may want to append something to it later, I may add a feature for it to distinguish
-between net data usage and local data usage. I may add a help menu to it, which would print itself with --help argument.
-
-
 This application relies on ifconfig and nmcli for its working. As you may know, ifconfig gives info on how much data has been used
 by a NIC in its listing. It uses that to determine if I've crossed data limit or not.
 Doesn't that mean it won't work for USB thethering and also it can't be deployed on any linux machine. I may work on this later. Currently,
